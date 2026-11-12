@@ -14,7 +14,10 @@ def _get(url: str, params: dict) -> dict:
     params = {**params, "f": "json"}
     for attempt in range(4):
         try:
-            j = _S.get(url, params=params, timeout=120).json()
+            # POST: long IN (...) lists overflow the URL limit on ArcGIS Online
+            r = _S.post(url, data=params, timeout=120) if url.endswith("/query") else \
+                _S.get(url, params=params, timeout=120)
+            j = r.json()
             if "error" in j:
                 raise RuntimeError(j["error"])
             return j
