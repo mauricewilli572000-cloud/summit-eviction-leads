@@ -18,12 +18,14 @@ def _get(url: str, params: dict) -> dict:
     params = {**params, "f": "json"}
     for attempt in range(4):
         try:
-            # POST: long IN (...) lists overflow the URL limit
-            r = _S.post(url, data=params, timeout=120) if url.endswith("/query") else \
-                _S.get(url, params=params, timeout=120)
+            # POST only when the query is long (big IN lists overflow URL limits); some
+            # servers (City of Toledo) refuse POSTed queries, so GET is the default.
+            long = sum(len(str(v)) for v in params.values()) > 1500
+            r = _S.post(url, data=params, timeout=120) if long else _S.get(url, params=params, timeout=120)
             j = r.json()
         except Exception as e:  # network / server hiccup: back off and retry
-            log.warning("query %s failed (%s), attempt %d", url[-60:], e, attempt + 1)
+            body = (getattr(locals().get("r"), "text", "") or "")[:150].replace("\n", " ")
+            log.warning("query %s failed (%s) %s, attempt %d", url[-60:], e, body, attempt + 1)
             time.sleep(10 * (attempt + 1))
             continue
         if "error" in j:
