@@ -68,11 +68,14 @@ def collect(today: date) -> list[dict]:
     """Every signal as {key: parcel or address, source, label, points, date, open, parcel, address, zip, ...}."""
     sig = []
     since = (today - timedelta(days=config.LOOKBACK_DAYS)).isoformat()
-    types = ",".join("'" + t + "'" for t in config.REQUEST_TYPES)
-    where = f"DESCRIPTION IN ({types}) AND INIT_DATE >= DATE '{since}'"
-    reqs = arcgis.query_all(config.SERVICE_REQUESTS, where,
-                            "REQUEST_ID,DESCRIPTION,INIT_DATE,CLOSED_DATE,STATUS,RESOLUTION,LOCATION,PROBZIP",
-                            order="REQUEST_ID")
+    # One query per type with a short LIKE prefix: the city's firewall rejects the full IN (...) list.
+    reqs = []
+    for t in config.REQUEST_TYPES:
+        prefix = " ".join(t.split()[:2]).replace("'", "''")
+        reqs += [r for r in arcgis.query_all(
+            config.SERVICE_REQUESTS, f"DESCRIPTION LIKE '{prefix}%' AND INIT_DATE >= DATE '{since}'",
+            "REQUEST_ID,DESCRIPTION,INIT_DATE,CLOSED_DATE,STATUS,RESOLUTION,LOCATION,PROBZIP",
+            order="REQUEST_ID") if r.get("DESCRIPTION") == t]
     log.info("service requests: %d", len(reqs))
     recent = (today - timedelta(days=config.OPEN_DAYS)).isoformat()
     for r in reqs:

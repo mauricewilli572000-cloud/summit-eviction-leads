@@ -6,7 +6,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pip install curl_cffi pytest
-      - run: python recon/t.py
       - run: cd trial && python -m pytest -q && python run_pipeline.py
       - run: |
           cd trial && python - <<'PY'
