@@ -1,17 +1,16 @@
-import json, re, html
+import json, re
 from curl_cffi import requests
 S = requests.Session(impersonate="chrome")
 B = "https://go.mcohio.org/applications/treasurer/search/"
-def out(t, o): print(f"@@{t}@@ " + json.dumps(o)[:5000], flush=True)
-def txt(s): return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", s, flags=re.S|re.I)))).strip()
+def out(t, o): print(f"@@{t}@@ " + json.dumps(o)[:6000], flush=True)
 r = S.get(B + "filedownloads.cfm", timeout=40)
-out("js", {"fdpopup": re.findall(r"function fdpopup.*?\}", r.text, re.S)[:1]})
-for code in ["DQ", "TR", "MS"]:
-    for page in [f"fdpopup.cfm?type={code}", f"filedownloadpopup.cfm?type={code}", f"filedownloads_popup.cfm?type={code}"]:
-        try:
-            p = S.get(B + page, timeout=40)
-            if p.status_code == 200 and "Error Occurred" not in p.text:
-                out("popup", {"code": code, "page": page, "text": txt(p.text)[:1500], "links": sorted(set(re.findall(r'href="([^"]+)"', p.text)))[:30]})
-                break
-        except Exception as e:
-            out("popup", {"code": code, "page": page, "err": str(e)[:150]})
+scripts = re.findall(r"<script[^>]*>(.*?)</script>", r.text, re.S | re.I)
+srcs = re.findall(r'<script[^>]+src="([^"]+)"', r.text, re.I)
+out("scripts", {"inline": [s.strip()[:1500] for s in scripts if "fdpopup" in s or "popup" in s.lower()][:3], "srcs": srcs})
+for s in srcs:
+    u = s if s.startswith("http") else B + s
+    try:
+        j = S.get(u, timeout=40).text
+        i = j.find("fdpopup")
+        if i >= 0: out("srcjs", {"u": u, "code": j[max(0, i-200): i+1500]})
+    except Exception as e: out("srcjs", {"u": u, "err": str(e)[:100]})
