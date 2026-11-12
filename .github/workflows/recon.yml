@@ -10,18 +10,12 @@ jobs:
       - run: |
           cd trial && python - <<'PY'
           import json, collections
-          d = json.load(open("docs/lucas_tax_delinquent.json")); m = d["meta"]; R = d["records"]
-          print("@@meta@@", json.dumps(m))
-          nv = [r for r in R if not r["vacant"]]
-          print("@@tiers@@", len(R), len(nv), collections.Counter(r["tier"] for r in nv), collections.Counter(r["property_category"] for r in R).most_common(8))
-          print("@@cond@@", collections.Counter(r["condition"] for r in R).most_common())
-          print("@@abs@@", sum(r["absentee_owner"] for r in R), "oos", sum(r["out_of_state"] for r in R), "llc", sum(r["company_owner"] for r in R), "rental", sum(r["rental_registered"] for r in R))
-          for r in R[:5]: print("@@top@@", r["score"], r["owner_name"], r["property_address"], r["property_city"], r["mailing_address"], r["mailing_state"], r["amount_owed"], r["flags"])
-          PY
-          python - <<'PY'
-          from curl_cffi import requests
-          S = requests.Session(impersonate="chrome")
-          for u in ["https://icare.co.lucas.oh.us/LucasCare/Datalets/Datalet.aspx?sIndex=0&idx=1&UseSearch=no&pin=0100044",
-                    "https://icare.co.lucas.oh.us/LucasCare/search/commonsearch.aspx?mode=parid"]:
-              r = S.get(u, timeout=40); print("@@url@@", u, r.status_code, r.url, "PALMWOOD" in r.text.upper(), "maintenance" in r.text.lower())
+          d = json.load(open("docs/toledo_code_enforcement.json")); L = d["leads"]
+          print("@@meta@@", json.dumps(d["meta"]))
+          print("@@owner@@", collections.Counter(r["owner_class"] for r in L), "matched", sum(1 for r in L if r["parcel"]))
+          print("@@scores@@", sorted(collections.Counter(r["score"] // 10 * 10 for r in L).items()))
+          print("@@types@@", collections.Counter(t for r in L for t in r["lead_types"]).most_common())
+          for r in L[:6]: print("@@top@@", r["score"], r["property_address"], r["owner_name"], r["mailing_address"], r["lead_types"], r["notes"])
+          un = [r for r in L if not r["parcel"]][:8]
+          for r in un: print("@@unmatched@@", r["property_address"], r["zip"])
           PY

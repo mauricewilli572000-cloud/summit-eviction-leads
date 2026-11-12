@@ -1,27 +1,31 @@
-"""Settings for the Lucas County (Toledo) tax delinquent scraper."""
+"""Settings for the Toledo (Lucas County, OH) code enforcement lead scraper."""
 from pathlib import Path
 
 ROOT = Path(__file__).parent
 DATA = ROOT / "data"
 DOCS = ROOT / "docs"
 
-# Lucas County Auditor's public ArcGIS layers (lcaudgis / AGOL).
-AUD = "https://lcaudgis.co.lucas.oh.us/gisaudserver/rest/services/"
-COLLECTIONS = AUD + "Hosted/AREIS_GENERAL_COLLECTIONS/FeatureServer/0"     # tax balances (annual snapshot)
-PARCEL_ADDR = AUD + "LandUse_Zoning/Parcels_Addresses_Generalized_Land_Use_Classification/MapServer/1"  # live owner + mailing
-CAMA = ("https://services3.arcgis.com/T8dczfwPixv79EgZ/arcgis/rest/services/"
-        "Lucas_County_TaxParcels/FeatureServer/0")                            # value, year built, condition
-RENTALS = ("https://services.arcgis.com/2snQ88YUjP9CNEbe/arcgis/rest/services/"
-           "Rental_Registry_SEPT_2025/FeatureServer/0")                       # City of Toledo rental registry
-AUDITOR_URL = "https://icare.co.lucas.oh.us/LucasCare/search/commonsearch.aspx?mode=parid"
+TOLEDO = "https://gis.toledo.oh.gov/arcgis/rest/services/"
+SERVICE_REQUESTS = TOLEDO + "Public/CityWorks_ServiceRequest_2022/MapServer/1"   # resident complaints (daily)
+MOWING = TOLEDO + "Grass_Mowing_Program/MapServer/0"                             # parcels the city mows
+DEMOS = TOLEDO + "Demolition_Map_MIL1/MapServer/0"                               # active & planned demolitions
+PARCEL_ADDR = ("https://lcaudgis.co.lucas.oh.us/gisaudserver/rest/services/LandUse_Zoning/"
+               "Parcels_Addresses_Generalized_Land_Use_Classification/MapServer/1")  # owner + mailing
+AUDITOR_URL = "https://icare.co.lucas.oh.us/LucasCare/Datalets/Datalet.aspx?sIndex=0&idx=1&UseSearch=no&pin={pin}"
 
-# --- filters (same as Montgomery) ---
-MIN_OWED = 1000.0
-MIN_YEARS = 2              # years behind as of the snapshot (certified year <= snapshot year - 1)
-SKIP_CLASSES = {"E", "U"}  # exempt, utility
+# Complaint types that point at a neglected property, and their base points.
+REQUEST_TYPES = {
+    "Trespasssing in Vacant Structure or House": ("Vacant house (trespassing)", 30),   # sic: city's spelling
+    "Structure Concern (Property Maintenance, Vehicles)": ("Structure / property maintenance", 20),
+    "Blight Concern (Debris, Trash, or Dumping)": ("Blight (debris / trash)", 15),
+    "Drug Activity or Drug House Concern": ("Drug house complaint", 15),
+    "High Grass Concern": ("High grass", 10),
+}
+MOWING_POINTS = 25           # the city mows it because the owner doesn't (code enforcement funded)
+DEMO_POINTS = 40             # on the city's active / planned demolition list
+LOOKBACK_DAYS = 180          # complaints filed in this window
+OPEN_DAYS = 90               # a closed complaint still counts as recent for this long
 
-STATE_FILE = DATA / "state.json"
-RECORDS_FILE = DATA / "records.json"
-DASHBOARD_JSON = DOCS / "lucas_tax_delinquent.json"
-GHL_CSV = DOCS / "lucas_tax_delinquent_ghl.csv"
-REMOVED_KEEP_DAYS = 60
+DASHBOARD_JSON = DOCS / "toledo_code_enforcement.json"
+GHL_CSV = DOCS / "ghl_toledo_code_enforcement.csv"
+STATE_FILE = DATA / "state.json"   # first-seen dates per lead

@@ -1,142 +1,103 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lucas County Tax Delinquent Leads</title>
+<title>Toledo Code Enforcement Leads</title>
 <style>
-  :root { --bg:#f6f7f9; --card:#fff; --ink:#1b1f24; --mute:#667085; --line:#e4e7ec;
-          --hot:#d92d20; --warm:#dc6803; --cold:#667085; --acc:#1d4ed8; }
-  * { box-sizing:border-box; }
-  body { margin:0; font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); }
-  header { padding:18px 24px 6px; }
-  h1 { margin:0; font-size:20px; }
-  .sub { color:var(--mute); font-size:13px; margin-top:2px; }
-  .tiles { display:flex; gap:12px; flex-wrap:wrap; padding:12px 24px; }
-  .tile { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 16px; min-width:130px; }
-  .tile b { display:block; font-size:22px; font-variant-numeric:tabular-nums; }
-  .tile span { color:var(--mute); font-size:12px; }
-  .filters { display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:6px 24px 12px; }
-  .filters input, .filters select, button { font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; }
-  .filters label { display:flex; gap:5px; align-items:center; color:var(--mute); }
-  button { cursor:pointer; } button.primary { background:var(--acc); color:#fff; border-color:var(--acc); }
-  .wrap { padding:0 24px 24px; overflow-x:auto; }
-  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
-  th, td { padding:7px 10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; white-space:nowrap; }
-  th { background:#f9fafb; font-size:12px; color:var(--mute); cursor:pointer; user-select:none; position:sticky; top:0; }
-  td.num { text-align:right; font-variant-numeric:tabular-nums; }
-  td.wrapcell { white-space:normal; min-width:180px; }
-  .tier { font-weight:600; } .Hot{color:var(--hot)} .Warm{color:var(--warm)} .Cold{color:var(--cold)}
-  .flag { display:inline-block; font-size:11px; background:#eef2ff; color:#3730a3; border-radius:6px; padding:1px 6px; margin:1px 2px 1px 0; }
-  tr.removed td { opacity:.5; }
-  .pager { display:flex; gap:8px; align-items:center; padding:10px 24px; color:var(--mute); }
-  a { color:var(--acc); text-decoration:none; }
+  :root { --bg:#f7f7f5; --fg:#1d1d1b; --mute:#6b6b66; --card:#fff; --line:#e2e2dc; --hot:#b3261e; --warm:#b26a00; --ok:#3d6b2f; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#161615; --fg:#ecece8; --mute:#9a9a93; --card:#1f1f1d; --line:#33332f; --hot:#ff8a80; --warm:#ffb74d; --ok:#9ccc65; }
+  }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.45 system-ui,sans-serif; }
+  header { padding:16px; }
+  h1 { margin:0 0 4px; font-size:20px; }
+  .meta { color:var(--mute); }
+  .bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:0 16px 12px; }
+  .bar input[type=search], .bar select { padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--fg); }
+  .wrap { overflow-x:auto; padding:0 16px 24px; }
+  table { border-collapse:collapse; width:100%; min-width:900px; background:var(--card); }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { cursor:pointer; user-select:none; position:sticky; top:0; background:var(--card); }
+  .score { font-weight:700; }
+  .hot { color:var(--hot); } .warm { color:var(--warm); } .ok { color:var(--ok); }
+  .tag { display:inline-block; padding:1px 6px; margin:1px 2px 1px 0; border:1px solid var(--line); border-radius:10px; font-size:12px; }
+  small { color:var(--mute); }
 </style>
 </head>
 <body>
 <header>
-  <h1>Lucas County, OH (Toledo) — Tax Delinquent Leads</h1>
-  <div class="sub" id="meta">Loading…</div>
+  <h1>Toledo code enforcement leads</h1>
+  <div class="meta" id="meta">Loading…</div>
 </header>
-<div class="tiles" id="tiles"></div>
-<div class="filters">
-  <input id="q" type="search" placeholder="Search owner, address, parcel…" size="32">
-  <select id="tier"><option value="">All tiers</option><option>Hot</option><option>Warm</option><option>Cold</option></select>
-  <select id="ptype"><option value="">All property types</option><option value="HOUSES">Houses (1-4 units + condo)</option>
-    <option>Single Family</option><option>Multi-Family (2-4)</option><option>Apartments (5+)</option><option>Condo</option>
-    <option>Mobile/Manufactured</option><option>Vacant Land</option><option>Commercial</option><option>Industrial</option>
-    <option>Agricultural</option><option>Exempt/Government</option><option>Other</option></select>
-  <select id="status"><option value="active">Active</option><option value="removed">Removed (paid)</option><option value="">All</option></select>
-  <label>Min owed $<input id="min" type="number" value="0" step="500" style="width:90px"></label>
-  <label><input id="abs" type="checkbox"> Absentee</label>
-  <label><input id="oos" type="checkbox"> Out of state</label>
-  <label><input id="adv" type="checkbox"> LLC / company</label>
-  <label><input id="fc" type="checkbox"> Poor condition</label>
-  <label><input id="novac" type="checkbox"> Hide vacant land</label>
-  <label><input id="rent" type="checkbox"> Rental</label>
-  <label><input id="hasprop" type="checkbox"> Has property address</label>
-  <label><input id="new" type="checkbox"> Added last 30 days</label>
-  <button class="primary" id="csv">Download CSV (filtered)</button>
+<div class="bar">
+  <input type="search" id="q" placeholder="Search address, owner, parcel…" size="32">
+  <label>Min score <select id="min"><option>0</option><option>30</option><option>50</option><option selected>60</option><option>80</option></select></label>
+  <label><input type="checkbox" id="owner"> has owner</label>
+  <label><input type="checkbox" id="oos"> out-of-state owner</label>
+  <label><input type="checkbox" id="fc"> city mows / demolition list</label>
+  <span class="meta" id="count"></span>
 </div>
 <div class="wrap">
-<table>
-  <thead><tr>
-    <th data-k="score">Score</th><th data-k="tier">Tier</th><th data-k="owner_name">Owner</th>
-    <th data-k="property_address">Property</th><th data-k="property_category">Type</th><th data-k="mailing_address">Mailing address</th>
-    <th data-k="amount_owed">Owed</th><th data-k="market_value">Value</th><th data-k="condition">Condition</th><th data-k="years_owed">Yrs owed</th><th>Flags</th>
-    <th data-k="doc_num">Parcel</th><th data-k="date_added">Added</th>
-  </tr></thead>
-  <tbody id="rows"></tbody>
-</table>
+  <table>
+    <thead><tr id="head"></tr></thead>
+    <tbody id="body"></tbody>
+  </table>
 </div>
-<div class="pager"><button id="prev">‹ Prev</button><span id="page"></span><button id="next">Next ›</button></div>
-
 <script>
-const $ = id => document.getElementById(id);
-const PAGE = 100;
-let ALL = [], VIEW = [], page = 0, sortK = "score", sortDir = -1;
-const money = v => v == null ? "" : "$" + Number(v).toLocaleString(undefined, {maximumFractionDigits: 0});
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const mail = r => [r.mailing_address, [r.mailing_city, r.mailing_state].filter(Boolean).join(", "), r.mailing_zip].filter(Boolean).join(" ");
-const prop = r => [r.property_address, r.property_city, r.property_zip].filter(Boolean).join(" ");
+const COLS = [
+  ["score","Score"], ["property_address","Property"], ["owner_name","Owner"], ["mailing_address","Mailing address"],
+  ["lead_types","Signals"], ["open_records","Records"], ["oldest_open_days","Days since first"], ["latest_date","Latest"], ["added_date","Added"]
+];
+let rows = [], sortKey = "score", sortDir = -1;
 
-fetch("lucas_tax_delinquent.json?v=" + Date.now()).then(r => r.json()).then(d => {
-  ALL = d.records; const m = d.meta;
-  $("meta").textContent = `Auditor tax snapshot ${m.snapshot} · owners re-checked ${m.generated} · source: Lucas County Auditor GIS · filters: ${m.filters}`;
-  const t = [["Active leads", m.active], ["Hot", m.hot], ["Warm", m.warm], ["New this update", m.added_this_run],
-             ["Paid / removed", m.removed], ["Total owed (active)", money(ALL.filter(r => r.status === "active").reduce((a, r) => a + (r.amount_owed || 0), 0))]];
-  $("tiles").innerHTML = t.map(([l, v]) => `<div class="tile"><b>${typeof v === "number" ? v.toLocaleString() : v}</b><span>${l}</span></div>`).join("");
-  apply();
-}).catch(e => { $("meta").textContent = "Could not load data: " + e; });
+function td(text, cls) { const c = document.createElement("td"); c.textContent = text ?? ""; if (cls) c.className = cls; return c; }
 
-function apply() {
-  const q = $("q").value.trim().toUpperCase(), tier = $("tier").value, st = $("status").value, pt = $("ptype").value;
-  const HOUSES = ["Single Family", "Multi-Family (2-4)", "Condo", "Mobile/Manufactured"];
-  const min = +$("min").value || 0, cutoff = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
-  VIEW = ALL.filter(r =>
-    (!st || r.status === st) && (!tier || r.tier === tier) &&
-    (!pt || (pt === "HOUSES" ? HOUSES.includes(r.property_category) : r.property_category === pt)) && (r.amount_owed || 0) >= min &&
-    (!$("abs").checked || r.absentee_owner) && (!$("oos").checked || (r.mailing_state && r.mailing_state !== "OH")) &&
-    (!$("adv").checked || r.company_owner) &&
-    (!$("fc").checked || ["Poor", "Very Poor", "Unsound"].includes(r.condition)) && (!$("novac").checked || !r.vacant) && (!$("rent").checked || r.rental_registered) && (!$("hasprop").checked || r.property_address) && (!$("new").checked || r.date_added >= cutoff) &&
-    (!q || `${r.owner_name} ${r.owner_name_2} ${prop(r)} ${mail(r)} ${r.doc_num}`.toUpperCase().includes(q)));
-  VIEW.sort((a, b) => { const x = a[sortK] ?? "", y = b[sortK] ?? ""; return (x > y ? 1 : x < y ? -1 : 0) * sortDir; });
-  page = 0; render();
-}
 function render() {
-  const rows = VIEW.slice(page * PAGE, (page + 1) * PAGE);
-  $("rows").innerHTML = rows.map(r => `<tr class="${r.status}">
-    <td class="num">${r.score}</td><td class="tier ${r.tier}">${r.tier}</td>
-    <td class="wrapcell">${esc(r.owner_name)}${r.owner_name_2 ? "<br><small>" + esc(r.owner_name_2) + "</small>" : ""}</td>
-    <td class="wrapcell">${esc(prop(r))}</td>
-    <td class="wrapcell" title="${esc(r.property_type)}">${esc(r.property_category)}<br><small>${esc(r.property_type)}</small></td>
-    <td class="wrapcell">${esc(mail(r))}</td>
-    <td class="num">${money(r.amount_owed)}</td><td class="num">${money(r.market_value)}</td><td>${esc(r.condition)}</td><td class="num">${esc(r.years_owed)}</td>
-    <td class="wrapcell">${(r.flags || []).map(f => `<span class="flag">${esc(f)}</span>`).join("")}</td>
-    <td><a href="${esc(r.auditor_url)}" target="_blank" rel="noopener">${esc(r.doc_num)}</a></td>
-    <td>${esc(r.date_added)}${r.status === "removed" ? "<br><small>removed " + esc(r.removed_date) + "</small>" : ""}</td></tr>`).join("");
-  const pages = Math.max(1, Math.ceil(VIEW.length / PAGE));
-  $("page").textContent = `${VIEW.length.toLocaleString()} leads · page ${page + 1} of ${pages}`;
-  $("prev").disabled = page === 0; $("next").disabled = page >= pages - 1;
+  const q = document.getElementById("q").value.trim().toLowerCase();
+  const min = +document.getElementById("min").value;
+  const needOwner = document.getElementById("owner").checked;
+  const oos = document.getElementById("oos").checked;
+  const fc = document.getElementById("fc").checked;
+  const shown = rows.filter(r =>
+    r.score >= min && (!needOwner || r.owner_name) && (!oos || r.out_of_state_owner) && (!fc || (r.cases_by_source.demolition || []).length || (r.cases_by_source.mowing || []).length) &&
+    (!q || [r.property_address, r.owner_name, r.parcel, r.mailing_address].join(" ").toLowerCase().includes(q))
+  ).sort((a, b) => {
+    const x = a[sortKey], y = b[sortKey];
+    const cmp = (typeof x === "number" && typeof y === "number") ? x - y : String(x ?? "").localeCompare(String(y ?? ""));
+    return cmp * sortDir;
+  });
+  document.getElementById("count").textContent = `${shown.length} of ${rows.length} leads`;
+  const body = document.getElementById("body");
+  body.replaceChildren(...shown.map(r => {
+    const tr = document.createElement("tr");
+    tr.title = (r.score_reasons || []).join("\n");
+    tr.append(td(r.score, "score " + (r.score >= 70 ? "hot" : r.score >= 50 ? "warm" : "ok")));
+    const p = document.createElement("td");
+    p.append(document.createTextNode(r.property_address));
+    const sm = document.createElement("small"); sm.textContent = ` ${r.parcel || ""}`;
+    p.append(document.createElement("br"), sm);
+    tr.append(p, td(r.owner_name || "—"), td(r.mailing_address || ""));
+    const sig = document.createElement("td");
+    (r.lead_types || []).forEach(t => { const s = document.createElement("span"); s.className = "tag"; s.textContent = t; sig.append(s); });
+        tr.append(sig, td(r.open_records), td(r.oldest_open_days), td(r.latest_date), td(r.added_date));
+    return tr;
+  }));
 }
-function csv() {
-  const cols = ["score","tier","owner_name","owner_name_2","property_address","property_city","property_zip",
-                "property_category","property_type","mailing_address",
-                "mailing_city","mailing_state","mailing_zip","amount_owed","market_value","last_sale_date",
-                "years_owed","tax_year","condition","year_built","rental_registered","company_owner","vacant","out_of_state",
-                "absentee_owner","flags","doc_num","date_added","status","auditor_url"];
-  const q = v => `"${String(Array.isArray(v) ? v.join("; ") : v ?? "").replace(/"/g, '""')}"`;
-  const body = [cols.join(","), ...VIEW.map(r => cols.map(c => q(r[c])).join(","))].join("\n");
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob(["﻿" + body], {type: "text/csv"}));
-  a.download = `lucas_tax_delinquent_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
-}
-["q","tier","ptype","status","min","abs","oos","adv","fc","rent","hasprop","new","novac"].forEach(id => $(id).addEventListener("input", apply));
-document.querySelectorAll("th[data-k]").forEach(th => th.addEventListener("click", () => {
-  const k = th.dataset.k; sortDir = sortK === k ? -sortDir : (["score","amount_owed","market_value","years_owed"].includes(k) ? -1 : 1); sortK = k; apply();
-}));
-$("prev").onclick = () => { page--; render(); }; $("next").onclick = () => { page++; render(); };
-$("csv").onclick = csv;
+
+const head = document.getElementById("head");
+COLS.forEach(([k, label]) => {
+  const th = document.createElement("th"); th.textContent = label;
+  th.onclick = () => { sortDir = (sortKey === k) ? -sortDir : -1; sortKey = k; render(); };
+  head.append(th);
+});
+["q", "min", "owner", "oos", "fc"].forEach(id => document.getElementById(id).addEventListener("input", render));
+
+fetch("toledo_code_enforcement.json").then(r => r.json()).then(d => {
+  rows = d.leads || [];
+  document.getElementById("meta").textContent = `Updated ${d.meta.updated_utc || "?"} UTC · ${rows.length} open leads · hover a row for the score breakdown`;
+  render();
+}).catch(e => { document.getElementById("meta").textContent = "Could not load data: " + e; });
 </script>
 </body>
 </html>
