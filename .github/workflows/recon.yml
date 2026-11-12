@@ -1,0 +1,19 @@
+name: recon
+on:
+  push:
+    paths: ["recon/recon.py", ".github/workflows/recon.yml"]
+permissions:
+  contents: write
+jobs:
+  recon:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install curl_cffi
+      - run: python recon/recon.py
+      - run: |
+          git config user.name bot; git config user.email bot@users.noreply.github.com
+          git add recon/out; git commit -qm "recon output"; git push
