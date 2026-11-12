@@ -1,19 +1,27 @@
 import json, re, html
 from curl_cffi import requests
 S = requests.Session(impersonate="chrome")
-def out(t, o): print(f"@@{t}@@ " + json.dumps(o)[:4000], flush=True)
+def out(t, o): print(f"@@{t}@@ " + json.dumps(o)[:5000], flush=True)
 def txt(s): return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", s, flags=re.S|re.I)))).strip()
-for host in ["https://pro.mcohio.org", "https://go.mcohio.org", "https://www.mcohio.org", "https://www.mctreas.org", "https://www.mcrealestate.org", "https://www.daytonohio.gov"]:
+r = S.get("https://pro.mcohio.org/", timeout=40)
+js = re.findall(r"function openDisclaimer\(\).*?\}", r.text, re.S)
+out("pro_disclaimer_fn", {"fn": js[:1], "scripts": re.findall(r'src="([^"]+\.js[^"]*)"', r.text)})
+m = re.search(r'id="disclaimer[^"]*"[^>]*>(.*?)</div>\s*</div>', r.text, re.S|re.I)
+d = re.search(r"(?is)disclaimer.{0,6000}", txt(r.text))
+out("pro_text", {"len": len(r.text), "disclaimer": (txt(m.group(1)) if m else "")[:3000], "around": d.group(0)[:2500] if d else ""})
+forms = re.findall(r"<(?:select|input)[^>]+>", r.text)
+out("pro_inputs", {"inputs": forms[:80]})
+for u in ["https://go.mcohio.org/applications/probate/prodcfm/casesearchx.cfm", "https://go.mcohio.org/applications/treasurer/search", "https://www.mcrealestate.org/"]:
     try:
-        r = S.get(host + "/robots.txt", timeout=30); out("robots", {"host": host, "status": r.status_code, "text": r.text[:600]})
-    except Exception as e: out("robots", {"host": host, "err": str(e)[:150]})
+        rr = S.get(u, timeout=40)
+        out("page", {"u": u, "status": rr.status_code, "text": txt(rr.text)[:1500], "forms": [f[:1200] for f in re.findall(r"<form.*?</form>", rr.text, re.S|re.I)[:2]], "links": sorted(set(re.findall(r'href="([^"]+)"', rr.text)))[:50]})
+    except Exception as e: out("page", {"u": u, "err": str(e)[:150]})
 try:
-    r = S.get("https://pro.mcohio.org/", timeout=40); t = txt(r.text)
-    i = t.find("Restriction"); out("pro", {"status": r.status_code, "restriction": t[max(0, i-300): i+1500], "links": sorted(set(re.findall(r'href="([^"]+)"', r.text)))[:40]})
-except Exception as e: out("pro", {"err": str(e)[:200]})
-# open data search on ArcGIS for Dayton / Montgomery
-for q in ["Dayton code enforcement", "Dayton nuisance", "Dayton housing violations", "Montgomery County Ohio parcels", "Dayton demolition"]:
-    try:
-        r = S.get("https://www.arcgis.com/sharing/rest/search", params={"q": q, "f": "json", "num": 10}, timeout=40).json()
-        out("arcgis", {"q": q, "hits": [(x.get("title"), x.get("owner"), x.get("type"), x.get("id"), x.get("modified")) for x in r.get("results", [])]})
-    except Exception as e: out("arcgis", {"q": q, "err": str(e)[:150]})
+    it = S.get("https://www.arcgis.com/sharing/rest/content/items/e4057ee9d25045b090036ce8685a2977/data", params={"f": "json"}, timeout=40).json()
+    layers = [(l.get("title"), l.get("url")) for l in it.get("operationalLayers", [])]
+    out("parcelmap", {"layers": layers})
+    for title, url in layers[:4]:
+        if url:
+            info = S.get(url, params={"f": "json"}, timeout=40).json()
+            out("layer", {"title": title, "url": url, "fields": [f["name"] for f in info.get("fields", [])][:80], "sublayers": [(x.get("id"), x.get("name")) for x in info.get("layers", [])][:20]})
+except Exception as e: out("parcelmap", {"err": str(e)[:200]})
