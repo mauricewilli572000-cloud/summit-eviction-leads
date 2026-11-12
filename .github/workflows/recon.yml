@@ -1,11 +1,12 @@
 name: recon
-on: {push: {paths: ["trial/**", ".github/workflows/recon.yml"]}, workflow_dispatch: {}}
+on: {push: {paths: ["trial/**", "recon/**", ".github/workflows/recon.yml"]}, workflow_dispatch: {}}
 jobs:
   r:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: pip install curl_cffi pytest
+      - run: python recon/t.py
       - run: cd trial && python -m pytest -q && python run_pipeline.py
       - run: |
           cd trial && python - <<'PY'
