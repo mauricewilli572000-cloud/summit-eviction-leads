@@ -68,14 +68,15 @@ def collect(today: date) -> list[dict]:
     """Every signal as {key: parcel or address, source, label, points, date, open, parcel, address, zip, ...}."""
     sig = []
     since = (today - timedelta(days=config.LOOKBACK_DAYS)).isoformat()
-    # One query per type with a short LIKE prefix: the city's firewall rejects the full IN (...) list.
+    # One single-condition query per type: the city's firewall (403) rejects compound
+    # where-clauses (AND / IN lists), so the date window is applied here instead.
     reqs = []
     for t in config.REQUEST_TYPES:
         prefix = " ".join(t.split()[:2]).replace("'", "''")
         reqs += [r for r in arcgis.query_all(
-            config.SERVICE_REQUESTS, f"DESCRIPTION LIKE '{prefix}%' AND INIT_DATE >= DATE '{since}'",
+            config.SERVICE_REQUESTS, f"DESCRIPTION LIKE '{prefix}%'",
             "REQUEST_ID,DESCRIPTION,INIT_DATE,CLOSED_DATE,STATUS,RESOLUTION,LOCATION,PROBZIP",
-            order="REQUEST_ID") if r.get("DESCRIPTION") == t]
+            order="REQUEST_ID") if r.get("DESCRIPTION") == t and iso(r.get("INIT_DATE")) >= since]
     log.info("service requests: %d", len(reqs))
     recent = (today - timedelta(days=config.OPEN_DAYS)).isoformat()
     for r in reqs:
@@ -89,8 +90,9 @@ def collect(today: date) -> list[dict]:
                     "open": is_open or opened >= recent, "id": f"SR{r['REQUEST_ID']}",
                     "address": addr_key(street), "zip": zip_ or str(r.get("PROBZIP") or ""), "parcel": "",
                     "status": clean(r.get("STATUS")), "note": clean(r.get("RESOLUTION"))})
-    mow = arcgis.query_all(config.MOWING, "Funding_Source = 'Code Enforcement' AND Active_Inactive = 'Active'",
-                           "Parcel_No,PARCELADDR,Address,OWNERNAME,LastMowDate,Comments,AssetID", order="OBJECTID")
+    mow = [m for m in arcgis.query_all(config.MOWING, "Funding_Source = 'Code Enforcement'",
+                                       "Parcel_No,PARCELADDR,Address,OWNERNAME,LastMowDate,Comments,AssetID,Active_Inactive",
+                                       order="OBJECTID") if m.get("Active_Inactive") == "Active"]
     log.info("city-mowed parcels: %d", len(mow))
     for m in mow:
         street, zip_ = split_location(m.get("PARCELADDR") or m.get("Address"))
