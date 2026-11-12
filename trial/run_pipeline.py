@@ -36,6 +36,10 @@ def addr_key(street: str) -> str:
     w = s.split()
     if len(w) > 2:
         w[-1] = SUFFIX.get(w[-1], w[-1])
+    for i in range(1, len(w) - 1):                 # '411 3 ST' -> '411 3RD ST' (Auditor spelling)
+        if w[i].isdigit():
+            n = int(w[i])
+            w[i] += "TH" if 10 <= n % 100 <= 20 else {1: "ST", 2: "ND", 3: "RD"}.get(n % 10, "TH")
     return " ".join(w)
 
 
@@ -82,6 +86,8 @@ def collect(today: date) -> list[dict]:
     for r in reqs:
         street, zip_ = split_location(r.get("LOCATION"))
         if not re.match(r"^\d+\s+\S", street):          # intersections / blocks: not a property
+            continue
+        if any(x in clean(r.get("RESOLUTION")) for x in config.DISMISSED):   # unfounded or duplicate
             continue
         label, pts = config.REQUEST_TYPES[r["DESCRIPTION"]]
         opened = iso(r.get("INIT_DATE"))

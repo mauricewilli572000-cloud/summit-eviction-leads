@@ -25,6 +25,7 @@ MOWING_POINTS = 25           # the city mows it because the owner doesn't (code 
 DEMO_POINTS = 40             # on the city's active / planned demolition list
 LOOKBACK_DAYS = 180          # complaints filed in this window
 OPEN_DAYS = 90               # a closed complaint still counts as recent for this long
+DISMISSED = ("NO PROBLEM FOUND", "UNFOUNDED", "NO VIOLATION", "DUPLICATE")   # complaint resolutions to ignore
 
 DASHBOARD_JSON = DOCS / "toledo_code_enforcement.json"
 GHL_CSV = DOCS / "ghl_toledo_code_enforcement.csv"
