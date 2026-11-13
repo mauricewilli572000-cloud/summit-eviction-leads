@@ -3,37 +3,36 @@ from curl_cffi import requests
 S = requests.Session(impersonate="chrome")
 def out(t, o): print(f"@@{t}@@ " + json.dumps(o, default=str)[:3800], flush=True)
 def get(u, **kw):
-    try: return S.get(u, timeout=kw.pop("timeout", 90), **kw)
+    try: return S.get(u, timeout=kw.pop("timeout", 300), **kw)
     except Exception as e: return str(e)[:200]
-for u in ["https://apps.franklincountyauditor.com/Outside_User_Files/", "https://apps.franklincountyauditor.com/Outside_User_Files/2026/", "https://cagis.org/Opendata/Quarterly_GIS_Data/"]:
-    r = get(u); t = r if isinstance(r, str) else r.text
-    out("dir", {"u": u, "items": re.findall(r'(?i)(?:href=["\']?)([^"\'>\s]+\.(?:zip|txt|csv|xlsx?|gdb|shp)|[^"\'>\s]+/)', t)[:150]})
-r = get("https://fiscaloffice.summitoh.net/data-downloads")
-out("summit", sorted(set(re.findall(r'href="([^"]+\.(?:zip|csv|txt|xlsx?))"', r.text)))) if not isinstance(r, str) else out("summit", r)
-# Lucas: every folder/service with sale in name
-L = "https://lcaudgis.co.lucas.oh.us/gisaudserver/rest/services/"
-root = get(L + "?f=json").json()
-found = []
-for fo in root.get("folders", []):
-    try:
-        for s in get(L + fo + "?f=json").json().get("services", []):
-            if re.search(r"sale|transfer|conv|deed|market", s["name"], re.I): found.append(s["name"] + ":" + s["type"])
-    except Exception: pass
-out("lucas_sales", found)
-# Montgomery GIS candidates
-for u in ["https://gis.mcohio.org/arcgis/rest/services", "https://gis.mcohio.org/server/rest/services", "https://mcgis.mcohio.org/arcgis/rest/services", "https://services.arcgis.com/search"]:
-    r = get(u, params={"f": "json"}); out("mont", {"u": u, "r": r if isinstance(r, str) else r.text[:400]})
-j = get("https://www.arcgis.com/sharing/rest/search", params={"q": "montgomery county ohio parcels", "num": 15, "f": "json"}).json()
-out("mont_agol", [(x.get("title"), x.get("type"), x.get("owner"), x.get("url")) for x in j.get("results", [])])
-j = get("https://www.arcgis.com/sharing/rest/search", params={"q": "lucas county ohio sales", "num": 15, "f": "json"}).json()
-out("lucas_agol", [(x.get("title"), x.get("type"), x.get("owner"), x.get("url")) for x in j.get("results", [])])
-j = get("https://www.arcgis.com/sharing/rest/search", params={"q": "summit county ohio parcels", "num": 15, "f": "json"}).json()
-out("summit_agol", [(x.get("title"), x.get("type"), x.get("owner"), x.get("url")) for x in j.get("results", [])])
-# Montgomery taxroll header only (stream first line)
-B = "https://go.mcohio.org/applications/treasurer/search/"
-h = get(B + "fdpopup.cfm?dtype=TR").text
-p = max(l.replace("\\", "/") for l in re.findall(r"href=[\"']?(data[\\/][^\"'\s>]+\.zip)", h, re.I))
-z = zipfile.ZipFile(io.BytesIO(get(B + p, timeout=600).content))
-rd = csv.reader(io.TextIOWrapper(z.open(z.namelist()[0]), encoding="latin-1"))
-hdr = [x.strip() for x in next(rd)]; row = [x.strip() for x in next(rd)]
-out("mont_hdr", dict(zip(hdr, row)))
+F = "https://apps.franklincountyauditor.com/Outside_User_Files/2026/2026-10-15%20Appraisal/"
+r = get(F); out("franklin_appr", re.findall(r'href="([^"]+)"', r.text) if not isinstance(r, str) else r)
+r = get("https://cagis.org/Opendata/Quarterly_GIS_Data/OpenData_Layer_List.txt"); out("cagis_layers", r.text[:3000] if not isinstance(r, str) else r)
+def zhead(url, maxfiles=3):
+    r = get(url)
+    if isinstance(r, str): return r
+    z = zipfile.ZipFile(io.BytesIO(r.content)); res = {"size": len(r.content), "files": z.namelist()[:10]}
+    for n in z.namelist()[:maxfiles]:
+        with z.open(n) as f:
+            lines = [f.readline().decode("latin-1").rstrip() for _ in range(3)]
+        res[n] = lines
+    return res
+SUM = "https://fiscaloffice.summitoh.net/sites/default/files/assets/forms/"
+for n in ["SC706_SALES_5.zip", "SC710_DWELL_5.zip", "SC705_PARDAT_4.zip"]:
+    out("summit_" + n, zhead(SUM + n))
+j = get("https://services3.arcgis.com/3Ukh5HzAdI6WZ3KP/arcgis/rest/services/TaxParcelSales_public/FeatureServer/0", params={"f": "json"}).json()
+out("summit_sales_layer", {"fields": [f["name"] for f in j.get("fields", [])], "edit": j.get("editingInfo")})
+s = get("https://services3.arcgis.com/3Ukh5HzAdI6WZ3KP/arcgis/rest/services/TaxParcelSales_public/FeatureServer/0/query", params={"where": "1=1", "outFields": "*", "resultRecordCount": 2, "returnGeometry": "false", "f": "json", "orderByFields": "OBJECTID DESC"}).json()
+out("summit_sales_sample", [f["attributes"] for f in s.get("features", [])])
+j = get("https://www.arcgis.com/sharing/rest/search", params={"q": 'owner:JasonClay AREIS', "num": 20, "f": "json"}).json()
+items = [(x.get("id"), x.get("title"), x.get("type"), x.get("modified"), x.get("size")) for x in j.get("results", [])]
+out("lucas_areis", items)
+for iid, title, typ, *_ in items:
+    if "2025" in (title or "") or "2026" in (title or ""):
+        d = get(f"https://www.arcgis.com/sharing/rest/content/items/{iid}/data", timeout=300)
+        out("lucas_areis_data", {"t": title, "s": getattr(d, "status_code", d), "ct": getattr(d, "headers", {}).get("content-type") if not isinstance(d, str) else "", "len": len(d.content) if not isinstance(d, str) else 0})
+        if not isinstance(d, str) and d.content[:2] == b"PK":
+            z = zipfile.ZipFile(io.BytesIO(d.content)); out("lucas_areis_zip", {n: z.getinfo(n).file_size for n in z.namelist()[:40]})
+            for n in z.namelist():
+                if re.search(r"sale", n, re.I):
+                    with z.open(n) as f: out("lucas_sales_head", {"n": n, "l": [f.readline().decode("latin-1").rstrip() for _ in range(3)]})
