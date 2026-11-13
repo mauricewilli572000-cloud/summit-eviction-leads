@@ -5,5 +5,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: pip install curl_cffi
+      - run: pip install curl_cffi && sudo apt-get install -y -qq mdbtools >/dev/null
       - run: python recon/recon.py
